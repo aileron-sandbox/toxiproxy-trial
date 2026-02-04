@@ -1,0 +1,64 @@
+apiVersion: core/v1
+kind: Entrypoint
+spec:
+  defaultLogger:
+    apiVersion: core/v1
+    kind: SLogger
+  defaultErrorHandler:
+    apiVersion: core/v1
+    kind: ErrorHandler
+  runners:
+    - apiVersion: core/v1
+      kind: HTTPServer
+
+---
+apiVersion: core/v1
+kind: SLogger
+spec:
+  level: Debug
+  logOutput:
+    outputTarget: File
+    logDir: ./limit_data
+
+---
+apiVersion: core/v1
+kind: HTTPServer
+spec:
+  addr: ":28080"
+  virtualHosts:
+    - hosts: []
+      middleware:
+        - apiVersion: core/v1
+          kind: HTTPLogger
+      handlers:
+        - handler:
+            apiVersion: core/v1
+            kind: ReverseProxyHandler
+
+---
+apiVersion: core/v1
+kind: ReverseProxyHandler
+spec:
+  loadBalancers:
+    - pathMatcher:
+        match: "/"
+        matchType: Prefix
+      upstreams:
+        - url: http://localhost:18080
+
+---
+apiVersion: core/v1
+kind: HTTPLogger
+spec:
+  request:
+    headers:
+      - name: "*"
+  response:
+    headers:
+      - name: "*"
+
+---
+apiVersion: core/v1
+kind: ErrorHandler
+spec:
+  stackAlways: true

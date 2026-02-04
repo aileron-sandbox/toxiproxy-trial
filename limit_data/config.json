@@ -1,0 +1,9 @@
+[
+  {
+    "name": "aileron-gateway",
+    "listen": ":18080",
+    "upstream": "localhost:8080",
+    "stream": "upstream",
+    "enabled": true
+  }
+]

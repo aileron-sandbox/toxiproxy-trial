@@ -1,0 +1,44 @@
+name: limit_data
+
+on:
+  workflow_dispatch: {}
+  push: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - name: Install tools
+        run: |
+          go install fortio.org/fortio@latest
+          go install go.k6.io/k6@latest
+          curl -OL https://github.com/Shopify/toxiproxy/releases/download/v2.12.0/toxiproxy-server-linux-amd64
+          curl -OL https://github.com/Shopify/toxiproxy/releases/download/v2.12.0/toxiproxy-cli-linux-amd64
+          curl -OL https://github.com/aileron-gateway/aileron-gateway/releases/download/v1.1.0/aileron-linux-amd64
+          chmod +x toxiproxy-server-linux-amd64
+          chmod +x toxiproxy-cli-linux-amd64
+          chmod +x aileron-linux-amd64
+      - run: fortio server -quiet &
+      - run: ./aileron-linux-amd64 -f limit_data/config.yaml &
+      - run: ./toxiproxy-server-linux-amd64 -config limit_data/config.json &
+      - run: sleep 5
+      - run: ./toxiproxy-cli-linux-amd64 toxic add -t limit_data -a bytes=500000 aileron-gateway
+      - name: Warmup
+        run: k6 run --quiet --summary-trend-stats "min,avg,med,max,p(90),p(95),p(96),p(97),p(98),p(99),p(99.9),p(99.99),p(100)" ./limit_data/warmup.js
+      - name: Measure
+        run: k6 run --quiet --summary-trend-stats "min,avg,med,max,p(90),p(95),p(96),p(97),p(98),p(99),p(99.9),p(99.99),p(100)" ./limit_data/measure.js
+      - name: Check Logs
+        run: |
+          cp limit_data/application.log application.log
+          sed -i '/"method":"POST","path":"\/debug"/d' application.log
+          sed -i '/"status":200/d' application.log
+          sed -i '/"status":500/d' application.log
+          sed -i '/"msg":"serve http error. status=500"/d' application.log
+          sed -i '/"msg":"serve http error. status=-1"/d' application.log
+          sed -i '/"msg":"server started. listening on \[::\]:28080"/d' application.log
+          sed -i '/"msg":"server shutting down \[::\]:28080 with graceful period 30 seconds."/d' application.log
+          cat application.log
+          test "$(cat application.log | wc -l)" -eq 0

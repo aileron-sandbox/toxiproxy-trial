@@ -1,0 +1,7 @@
+/fortio
+/aileron-linux-amd64
+/toxiproxy-server-linux-amd64
+/toxiproxy-cli-linux-amd64
+/toxiproxy-server
+/toxiproxy-cli
+*.log
